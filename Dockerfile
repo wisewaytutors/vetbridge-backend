@@ -1,18 +1,9 @@
 FROM node:20-alpine
-
 WORKDIR /app
-
-# Install dependencies first (cached layer)
 COPY package*.json ./
-RUN npm install --include=dev
-
-# Copy source
+RUN npm install --omit=dev
 COPY . .
-
-# Generate Prisma client
+RUN apk add --no-cache openssl
 RUN npx prisma generate
-
 EXPOSE 3000
-
-# Use start script (runs migrations then server)
-CMD ["sh", "start.sh"]
+CMD ["node", "server.js"]   # or your actual start file
