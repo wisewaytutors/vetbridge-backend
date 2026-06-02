@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "VetBridge — Ethiopia's mobile veterinary platform API",
   "main": "src/server.js",
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
   "scripts": {
+    "verify:deploy": "node scripts/verify-deploy-ready.js",
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "postinstall": "node scripts/postinstall-prisma.js",
