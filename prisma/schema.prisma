@@ -9,15 +9,75 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole { OWNER VET CLINIC_ADMIN ADMIN }
-enum Language { EN AM OR }
-enum BookingType { HOME_VISIT CLINIC EMERGENCY }
-enum BookingStatus { PENDING CONFIRMED EN_ROUTE IN_PROGRESS COMPLETED CANCELLED DISPUTED }
-enum PaymentMethod { TELEBIRR CBE_BIRR CASH BANK_TRANSFER }
-enum PaymentStatus { PENDING HELD_IN_ESCROW RELEASED REFUNDED FAILED }
-enum ListingCategory { LIVESTOCK PETS FEEDS EGGS DAIRY HONEY VET_SUPPLIES EQUIPMENT OTHER }
-enum ListingStatus { ACTIVE SOLD REMOVED UNDER_REVIEW }
-enum PriceType { FIXED NEGOTIABLE PER_UNIT CONTACT_FOR_PRICE }
+enum UserRole {
+  OWNER
+  VET
+  CLINIC_ADMIN
+  ADMIN
+}
+
+enum Language {
+  EN
+  AM
+  OR
+}
+
+enum BookingType {
+  HOME_VISIT
+  CLINIC
+  EMERGENCY
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PaymentMethod {
+  TELEBIRR
+  CBE_BIRR
+  CASH
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD_IN_ESCROW
+  RELEASED
+  REFUNDED
+  FAILED
+}
+
+enum ListingCategory {
+  LIVESTOCK
+  PETS
+  FEEDS
+  EGGS
+  DAIRY
+  HONEY
+  VET_SUPPLIES
+  EQUIPMENT
+  OTHER
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  REMOVED
+  UNDER_REVIEW
+}
+
+enum PriceType {
+  FIXED
+  NEGOTIABLE
+  PER_UNIT
+  CONTACT_FOR_PRICE
+}
 
 model User {
   id        String   @id @default(uuid())
@@ -42,6 +102,7 @@ model User {
   aiSessions      AiSession[]
   otpCodes        OtpCode[]
   sosEvents       SosEvent[]
+
   @@map("users")
 }
 
@@ -54,6 +115,7 @@ model OtpCode {
   usedAt    DateTime? @map("used_at")
   createdAt DateTime  @default(now()) @map("created_at")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("otp_codes")
 }
 
@@ -69,14 +131,14 @@ model VetProfile {
   serviceRadiusKm   Int       @default(5) @map("service_radius_km")
   primaryArea       String?   @map("primary_area")
   secondaryAreas    String[]  @map("secondary_areas")
-  ratingAvg         Decimal   @default(0) @db.Decimal(3,2) @map("rating_avg")
+  ratingAvg         Decimal   @default(0) @map("rating_avg") @db.Decimal(3, 2)
   totalReviews      Int       @default(0) @map("total_reviews")
   completedBookings Int       @default(0) @map("completed_bookings")
   isOnline          Boolean   @default(false) @map("is_online")
   isVerified        Boolean   @default(false) @map("is_verified")
   verifiedAt        DateTime? @map("verified_at")
-  currentLat        Decimal?  @db.Decimal(9,6) @map("current_lat")
-  currentLng        Decimal?  @db.Decimal(9,6) @map("current_lng")
+  currentLat        Decimal?  @map("current_lat") @db.Decimal(9, 6)
+  currentLng        Decimal?  @map("current_lng") @db.Decimal(9, 6)
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -86,30 +148,32 @@ model VetProfile {
   wallet           VetWallet?
   leakageFlags     LeakageFlag[]
   patientRelations VetPatientRelationship[]
+
   @@map("vet_profiles")
 }
 
 model ClinicProfile {
-  id               String    @id @default(uuid())
-  userId           String    @unique @map("user_id")
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
   name             String
   address          String
   neighbourhood    String
-  lat              Decimal?  @db.Decimal(9,6)
-  lng              Decimal?  @db.Decimal(9,6)
+  lat              Decimal? @db.Decimal(9, 6)
+  lng              Decimal? @db.Decimal(9, 6)
   phone            String?
-  licenseNo        String?   @map("license_no")
+  licenseNo        String?  @map("license_no")
   services         String[]
-  hoursOpen        String?   @map("hours_open")
-  hoursClose       String?   @map("hours_close")
-  is24hEmergency   Boolean   @default(false) @map("is_24h_emergency")
-  subscriptionPlan String    @default("starter") @map("subscription_plan")
-  isVerified       Boolean   @default(false) @map("is_verified")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  hoursOpen        String?  @map("hours_open")
+  hoursClose       String?  @map("hours_close")
+  is24hEmergency   Boolean  @default(false) @map("is_24h_emergency")
+  subscriptionPlan String   @default("starter") @map("subscription_plan")
+  isVerified       Boolean  @default(false) @map("is_verified")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   staff ClinicStaff[]
+
   @@map("clinic_profiles")
 }
 
@@ -123,6 +187,7 @@ model ClinicStaff {
 
   clinic ClinicProfile @relation(fields: [clinicId], references: [id], onDelete: Cascade)
   vet    VetProfile    @relation(fields: [vetId], references: [id], onDelete: Cascade)
+
   @@unique([clinicId, vetId])
   @@map("clinic_staff")
 }
@@ -134,7 +199,7 @@ model Pet {
   species     String
   breed       String?
   dob         DateTime?
-  weightKg    Decimal?  @db.Decimal(5,2) @map("weight_kg")
+  weightKg    Decimal?  @map("weight_kg") @db.Decimal(5, 2)
   sex         String?
   microchipId String?   @unique @map("microchip_id")
   bloodType   String?   @map("blood_type")
@@ -148,6 +213,7 @@ model Pet {
   medicalRecords   MedicalRecord[]
   vaccinations     Vaccination[]
   patientRelations VetPatientRelationship[]
+
   @@map("pets")
 }
 
@@ -161,6 +227,7 @@ model VetPatientRelationship {
 
   vet VetProfile @relation(fields: [vetId], references: [id], onDelete: Cascade)
   pet Pet        @relation(fields: [petId], references: [id], onDelete: Cascade)
+
   @@unique([vetId, petId])
   @@map("vet_patient_relationships")
 }
@@ -172,8 +239,8 @@ model Booking {
   petId              String        @map("pet_id")
   type               BookingType   @default(HOME_VISIT)
   status             BookingStatus @default(PENDING)
-  ownerLat           Decimal?      @db.Decimal(9,6) @map("owner_lat")
-  ownerLng           Decimal?      @db.Decimal(9,6) @map("owner_lng")
+  ownerLat           Decimal?      @map("owner_lat") @db.Decimal(9, 6)
+  ownerLng           Decimal?      @map("owner_lng") @db.Decimal(9, 6)
   ownerAddress       String?       @map("owner_address")
   ownerNeighbourhood String?       @map("owner_neighbourhood")
   ownerPhone         String?       @map("owner_phone")
@@ -193,19 +260,21 @@ model Booking {
   review          Review?
   trackingSession TrackingSession?
   chatMessages    ChatMessage[]
+
   @@map("bookings")
 }
 
 model TrackingSession {
   id         String   @id @default(uuid())
   bookingId  String   @unique @map("booking_id")
-  vetLat     Decimal? @db.Decimal(9,6) @map("vet_lat")
-  vetLng     Decimal? @db.Decimal(9,6) @map("vet_lng")
+  vetLat     Decimal? @map("vet_lat") @db.Decimal(9, 6)
+  vetLng     Decimal? @map("vet_lng") @db.Decimal(9, 6)
   etaMinutes Int?     @map("eta_minutes")
-  distanceKm Decimal? @db.Decimal(6,2) @map("distance_km")
+  distanceKm Decimal? @map("distance_km") @db.Decimal(6, 2)
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   @@map("tracking_sessions")
 }
 
@@ -218,15 +287,16 @@ model ChatMessage {
   createdAt   DateTime @default(now()) @map("created_at")
 
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
   @@map("chat_messages")
 }
 
 model Payment {
   id          String        @id @default(uuid())
   bookingId   String        @unique @map("booking_id")
-  amount      Decimal       @db.Decimal(10,2)
-  platformFee Decimal       @db.Decimal(10,2) @map("platform_fee")
-  netToVet    Decimal       @db.Decimal(10,2) @map("net_to_vet")
+  amount      Decimal       @db.Decimal(10, 2)
+  platformFee Decimal       @map("platform_fee") @db.Decimal(10, 2)
+  netToVet    Decimal       @map("net_to_vet") @db.Decimal(10, 2)
   method      PaymentMethod
   status      PaymentStatus @default(PENDING)
   externalRef String?       @map("external_ref")
@@ -237,41 +307,44 @@ model Payment {
   updatedAt   DateTime      @updatedAt @map("updated_at")
 
   booking Booking @relation(fields: [bookingId], references: [id])
+
   @@map("payments")
 }
 
 model VetWallet {
   id               String    @id @default(uuid())
   vetId            String    @unique @map("vet_id")
-  availableBalance Decimal   @default(0) @db.Decimal(10,2) @map("available_balance")
-  pendingEscrow    Decimal   @default(0) @db.Decimal(10,2) @map("pending_escrow")
-  totalEarned      Decimal   @default(0) @db.Decimal(10,2) @map("total_earned")
+  availableBalance Decimal   @default(0) @map("available_balance") @db.Decimal(10, 2)
+  pendingEscrow    Decimal   @default(0) @map("pending_escrow") @db.Decimal(10, 2)
+  totalEarned      Decimal   @default(0) @map("total_earned") @db.Decimal(10, 2)
   lastPayoutAt     DateTime? @map("last_payout_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
   vet            VetProfile          @relation(fields: [vetId], references: [id], onDelete: Cascade)
   transactions   WalletTransaction[]
   payoutRequests PayoutRequest[]
+
   @@map("vet_wallets")
 }
 
 model WalletTransaction {
   id          String   @id @default(uuid())
   walletId    String   @map("wallet_id")
-  amount      Decimal  @db.Decimal(10,2)
+  amount      Decimal  @db.Decimal(10, 2)
   type        String
   bookingId   String?  @map("booking_id")
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
 
   wallet VetWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
   @@map("wallet_transactions")
 }
 
 model PayoutRequest {
   id          String        @id @default(uuid())
   walletId    String        @map("wallet_id")
-  amount      Decimal       @db.Decimal(10,2)
+  amount      Decimal       @db.Decimal(10, 2)
   method      PaymentMethod
   accountNo   String        @map("account_no")
   status      String        @default("pending")
@@ -280,6 +353,7 @@ model PayoutRequest {
   processedAt DateTime?     @map("processed_at")
 
   wallet VetWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
   @@map("payout_requests")
 }
 
@@ -301,6 +375,7 @@ model MedicalRecord {
   booking      Booking       @relation(fields: [bookingId], references: [id])
   vaccinations Vaccination[]
   medications  Medication[]
+
   @@map("medical_records")
 }
 
@@ -319,6 +394,7 @@ model Vaccination {
   pet          Pet            @relation(fields: [petId], references: [id])
   record       MedicalRecord? @relation(fields: [recordId], references: [id])
   reminderJobs ReminderJob[]
+
   @@map("vaccinations")
 }
 
@@ -333,6 +409,7 @@ model Medication {
   notes     String?
 
   record MedicalRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
   @@map("medications")
 }
 
@@ -348,6 +425,7 @@ model ReminderJob {
   createdAt      DateTime  @default(now()) @map("created_at")
 
   vaccination Vaccination @relation(fields: [vaccinationId], references: [id], onDelete: Cascade)
+
   @@map("reminder_jobs")
 }
 
@@ -363,6 +441,7 @@ model Review {
 
   booking  Booking @relation(fields: [bookingId], references: [id])
   reviewer User    @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+
   @@map("reviews")
 }
 
@@ -372,12 +451,12 @@ model Listing {
   category       ListingCategory
   title          String
   description    String?
-  price          Decimal?        @db.Decimal(12,2)
+  price          Decimal?        @db.Decimal(12, 2)
   priceType      PriceType       @default(FIXED) @map("price_type")
   quantity       String?
   location       String?
-  lat            Decimal?        @db.Decimal(9,6)
-  lng            Decimal?        @db.Decimal(9,6)
+  lat            Decimal?        @db.Decimal(9, 6)
+  lng            Decimal?        @db.Decimal(9, 6)
   paymentMethods String[]        @map("payment_methods")
   images         String[]
   status         ListingStatus   @default(ACTIVE)
@@ -389,6 +468,7 @@ model Listing {
 
   seller User           @relation(fields: [sellerId], references: [id])
   offers ListingOffer[]
+
   @@map("listings")
 }
 
@@ -396,7 +476,7 @@ model ListingOffer {
   id            String   @id @default(uuid())
   listingId     String   @map("listing_id")
   buyerId       String   @map("buyer_id")
-  offerAmount   Decimal? @db.Decimal(12,2) @map("offer_amount")
+  offerAmount   Decimal? @map("offer_amount") @db.Decimal(12, 2)
   message       String?
   paymentMethod String?  @map("payment_method")
   status        String   @default("pending")
@@ -404,6 +484,7 @@ model ListingOffer {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
   @@map("listing_offers")
 }
 
@@ -418,6 +499,7 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("notifications")
 }
 
@@ -433,6 +515,7 @@ model AiSession {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("ai_sessions")
 }
 
@@ -440,8 +523,8 @@ model SosEvent {
   id              String    @id @default(uuid())
   ownerId         String    @map("owner_id")
   emergencyType   String    @map("emergency_type")
-  ownerLat        Decimal   @db.Decimal(9,6) @map("owner_lat")
-  ownerLng        Decimal   @db.Decimal(9,6) @map("owner_lng")
+  ownerLat        Decimal   @map("owner_lat") @db.Decimal(9, 6)
+  ownerLng        Decimal   @map("owner_lng") @db.Decimal(9, 6)
   ownerPhone      String    @map("owner_phone")
   respondingVetId String?   @map("responding_vet_id")
   bookingId       String?   @map("booking_id")
@@ -450,13 +533,14 @@ model SosEvent {
   resolvedAt      DateTime? @map("resolved_at")
 
   owner User @relation(fields: [ownerId], references: [id])
+
   @@map("sos_events")
 }
 
 model LeakageFlag {
   id              String    @id @default(uuid())
   vetId           String    @map("vet_id")
-  leakageScore    Decimal   @db.Decimal(5,2) @map("leakage_score")
+  leakageScore    Decimal   @map("leakage_score") @db.Decimal(5, 2)
   suspiciousCount Int       @map("suspicious_count")
   totalBookings   Int       @map("total_bookings")
   status          String    @default("flagged")
@@ -466,5 +550,6 @@ model LeakageFlag {
   resolvedAt      DateTime? @map("resolved_at")
 
   vet VetProfile @relation(fields: [vetId], references: [id], onDelete: Cascade)
+
   @@map("leakage_flags")
 }
