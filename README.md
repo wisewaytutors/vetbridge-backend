@@ -45,42 +45,33 @@ npm run dev
 
 ## Deploy to Railway (recommended)
 
+This repo ships `railway.toml` so Railway builds with **Docker** (schema is embedded in the `Dockerfile`).
+
+1. Push the repo to GitHub and connect it in Railway.
+2. In the service **Settings → Build**, confirm **Builder** is `Dockerfile` (not Nixpacks-only unless you use `nixpacks.toml`).
+3. Add **PostgreSQL** and **Redis** plugins; set `DATABASE_URL` and `REDIS_URL`.
+4. Set other env vars from `.env.example` (`JWT_SECRET`, etc.).
+5. Deploy. On first boot, `start.sh` runs `prisma db push` to create tables, then starts the API.
+
 ```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login
-railway login
-
-# Create project
-railway init
-
-# Add PostgreSQL
-railway add postgresql
-
-# Add Redis
-railway add redis
-
-# Set env variables (from .env)
-railway variables set JWT_SECRET=... ANTHROPIC_API_KEY=... (etc)
-
-# Deploy
-railway up
-
-# Run migrations on Railway
-railway run npx prisma migrate deploy
+railway up   # optional, if using CLI
 ```
 
 ---
 
 ## Deploy to Render
 
-1. Push to GitHub
-2. Go to https://render.com → New Web Service
-3. Connect repo → Runtime: Node → Build: `npm install && npx prisma generate` → Start: `npm start`
-4. Add PostgreSQL and Redis services
-5. Set all env vars from `.env.example`
-6. Deploy → Run `npx prisma migrate deploy` in Shell
+Use the included **Blueprint** (`render.yaml`) or configure manually:
+
+1. Push to GitHub.
+2. **New → Blueprint** and select this repo (applies `render.yaml`), **or** New Web Service with:
+   - **Runtime:** Docker
+   - **Dockerfile path:** `./Dockerfile`
+3. Attach PostgreSQL and Redis; link `DATABASE_URL` / `REDIS_URL`.
+4. Set env vars from `.env.example`.
+5. Deploy. The container runs `prisma db push` then `node src/server.js`.
+
+**Important:** If the service was created earlier with **Node** runtime and build `npx prisma generate`, switch it to **Docker** or the Dockerfile fix will not run.
 
 ---
 

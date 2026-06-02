@@ -7,11 +7,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install --omit=dev
-
-COPY . .
-
-# Ensure prisma directory exists and write the complete schema using a heredoc
+# Schema must exist before npm install (postinstall runs prisma generate)
 RUN mkdir -p prisma && cat <<'EOF' > prisma/schema.prisma
 // VetBridge — prisma/schema.prisma
 
@@ -576,9 +572,12 @@ model LeakageFlag {
 }
 EOF
 
-# Now Prisma will find the schema and generate the client
+RUN npm install --omit=dev
+
+COPY . .
+
 RUN npx prisma generate
 
 EXPOSE 3000
 
-CMD ["node", "src/server.js"]
+CMD ["sh", "-c", "npx prisma db push --skip-generate && exec node src/server.js"]

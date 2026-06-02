@@ -1,0 +1,12 @@
+# Used only if Railway/Nixpacks builds without Docker
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npx prisma generate"]
+
+[start]
+cmd = "sh start.sh"
