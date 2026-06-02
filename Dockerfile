@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies first (cached layer)
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm install --include=dev
 
 # Copy source
 COPY . .
