@@ -27,7 +27,17 @@ if (config.env !== 'test') {
   app.use(morgan('combined', { stream: { write: (m) => logger.info(m.trim()) } }));
 }
 
-// ── Health check ──────────────────────────────────────────────────────────────
+// ── Root + health ─────────────────────────────────────────────────────────────
+app.get('/', (_req, res) =>
+  res.json({
+    success: true,
+    name:    'VetBridge API',
+    version: '1.0.0',
+    health:  '/health',
+    api:     '/api',
+  })
+);
+
 app.get('/health', (_req, res) =>
   res.json({ status: 'ok', platform: 'VetBridge', version: '1.0.0', ts: new Date().toISOString() })
 );
