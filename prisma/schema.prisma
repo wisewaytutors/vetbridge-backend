@@ -52,6 +52,12 @@ enum PaymentStatus {
   REFUNDED
   FAILED
 }
+enum VetApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 
 enum ListingCategory {
   LIVESTOCK
