@@ -1,8 +1,584 @@
 FROM node:20-alpine
+
+# Avoid Prisma OpenSSL warnings
+RUN apk add --no-cache openssl
+
 WORKDIR /app
+
 COPY package*.json ./
+
 RUN npm install --omit=dev
+
 COPY . .
+
+# Ensure prisma directory exists and write the complete schema using a heredoc
+RUN mkdir -p prisma && cat <<'EOF' > prisma/schema.prisma
+// VetBridge — prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  VET
+  CLINIC_ADMIN
+  ADMIN
+}
+
+enum Language {
+  EN
+  AM
+  OR
+}
+
+enum BookingType {
+  HOME_VISIT
+  CLINIC
+  EMERGENCY
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+enum PaymentMethod {
+  TELEBIRR
+  CBE_BIRR
+  CASH
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD_IN_ESCROW
+  RELEASED
+  REFUNDED
+  FAILED
+}
+
+enum VetApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ListingCategory {
+  LIVESTOCK
+  PETS
+  FEEDS
+  EGGS
+  DAIRY
+  HONEY
+  VET_SUPPLIES
+  EQUIPMENT
+  OTHER
+}
+
+enum ListingStatus {
+  ACTIVE
+  SOLD
+  REMOVED
+  UNDER_REVIEW
+}
+
+enum PriceType {
+  FIXED
+  NEGOTIABLE
+  PER_UNIT
+  CONTACT_FOR_PRICE
+}
+
+model User {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  name      String
+  email     String?  @unique
+  role      UserRole @default(OWNER)
+  language  Language @default(EN)
+  avatarUrl String?  @map("avatar_url")
+  fcmToken  String?  @map("fcm_token")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  vetProfile      VetProfile?
+  clinicProfile   ClinicProfile?
+  petsOwned       Pet[]
+  bookingsAsOwner Booking[]      @relation("OwnerBookings")
+  reviewsGiven    Review[]       @relation("ReviewsGiven")
+  listings        Listing[]
+  notifications   Notification[]
+  aiSessions      AiSession[]
+  otpCodes        OtpCode[]
+  sosEvents       SosEvent[]
+
+  @@map("users")
+}
+
+model OtpCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  phone     String
+  code      String
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("otp_codes")
+}
+
+model VetProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique @map("user_id")
+  licenseNo         String    @unique @map("license_no")
+  licenseDocUrl     String?   @map("license_doc_url")
+  nationalIdUrl     String?   @map("national_id_url")
+  yearsExperience   Int       @default(0) @map("years_experience")
+  specializations   String[]
+  workModes         String[]  @map("work_modes")
+  serviceRadiusKm   Int       @default(5) @map("service_radius_km")
+  primaryArea       String?   @map("primary_area")
+  secondaryAreas    String[]  @map("secondary_areas")
+  ratingAvg         Decimal   @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  totalReviews      Int       @default(0) @map("total_reviews")
+  completedBookings Int       @default(0) @map("completed_bookings")
+  isOnline          Boolean   @default(false) @map("is_online")
+  isVerified        Boolean   @default(false) @map("is_verified")
+  verifiedAt        DateTime? @map("verified_at")
+  currentLat        Decimal?  @map("current_lat") @db.Decimal(9, 6)
+  currentLng        Decimal?  @map("current_lng") @db.Decimal(9, 6)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings         Booking[]                @relation("VetBookings")
+  clinicStaff      ClinicStaff[]
+  wallet           VetWallet?
+  leakageFlags     LeakageFlag[]
+  patientRelations VetPatientRelationship[]
+
+  @@map("vet_profiles")
+}
+
+model ClinicProfile {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  name             String
+  address          String
+  neighbourhood    String
+  lat              Decimal? @db.Decimal(9, 6)
+  lng              Decimal? @db.Decimal(9, 6)
+  phone            String?
+  licenseNo        String?  @map("license_no")
+  services         String[]
+  hoursOpen        String?  @map("hours_open")
+  hoursClose       String?  @map("hours_close")
+  is24hEmergency   Boolean  @default(false) @map("is_24h_emergency")
+  subscriptionPlan String   @default("starter") @map("subscription_plan")
+  isVerified       Boolean  @default(false) @map("is_verified")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  staff ClinicStaff[]
+
+  @@map("clinic_profiles")
+}
+
+model ClinicStaff {
+  id        String   @id @default(uuid())
+  clinicId  String   @map("clinic_id")
+  vetId     String   @map("vet_id")
+  staffType String   @default("employee") @map("staff_type")
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clinic ClinicProfile @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  vet    VetProfile    @relation(fields: [vetId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, vetId])
+  @@map("clinic_staff")
+}
+
+model Pet {
+  id          String    @id @default(uuid())
+  ownerId     String    @map("owner_id")
+  name        String
+  species     String
+  breed       String?
+  dob         DateTime?
+  weightKg    Decimal?  @map("weight_kg") @db.Decimal(5, 2)
+  sex         String?
+  microchipId String?   @unique @map("microchip_id")
+  bloodType   String?   @map("blood_type")
+  allergies   String?
+  photoUrl    String?   @map("photo_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  owner            User                     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookings         Booking[]
+  medicalRecords   MedicalRecord[]
+  vaccinations     Vaccination[]
+  patientRelations VetPatientRelationship[]
+
+  @@map("pets")
+}
+
+model VetPatientRelationship {
+  id             String   @id @default(uuid())
+  vetId          String   @map("vet_id")
+  petId          String   @map("pet_id")
+  firstBookingAt DateTime @map("first_booking_at")
+  totalVisits    Int      @default(1) @map("total_visits")
+  isPrimaryVet   Boolean  @default(false) @map("is_primary_vet")
+
+  vet VetProfile @relation(fields: [vetId], references: [id], onDelete: Cascade)
+  pet Pet        @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([vetId, petId])
+  @@map("vet_patient_relationships")
+}
+
+model Booking {
+  id                 String        @id @default(uuid())
+  ownerId            String        @map("owner_id")
+  vetId              String        @map("vet_id")
+  petId              String        @map("pet_id")
+  type               BookingType   @default(HOME_VISIT)
+  status             BookingStatus @default(PENDING)
+  ownerLat           Decimal?      @map("owner_lat") @db.Decimal(9, 6)
+  ownerLng           Decimal?      @map("owner_lng") @db.Decimal(9, 6)
+  ownerAddress       String?       @map("owner_address")
+  ownerNeighbourhood String?       @map("owner_neighbourhood")
+  ownerPhone         String?       @map("owner_phone")
+  notes              String?
+  scheduledAt        DateTime?     @map("scheduled_at")
+  confirmedAt        DateTime?     @map("confirmed_at")
+  completedAt        DateTime?     @map("completed_at")
+  cancelledAt        DateTime?     @map("cancelled_at")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  owner           User             @relation("OwnerBookings", fields: [ownerId], references: [id])
+  vet             VetProfile       @relation("VetBookings", fields: [vetId], references: [id])
+  pet             Pet              @relation(fields: [petId], references: [id])
+  payment         Payment?
+  medicalRecord   MedicalRecord?
+  review          Review?
+  trackingSession TrackingSession?
+  chatMessages    ChatMessage[]
+
+  @@map("bookings")
+}
+
+model TrackingSession {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique @map("booking_id")
+  vetLat     Decimal? @map("vet_lat") @db.Decimal(9, 6)
+  vetLng     Decimal? @map("vet_lng") @db.Decimal(9, 6)
+  etaMinutes Int?     @map("eta_minutes")
+  distanceKm Decimal? @map("distance_km") @db.Decimal(6, 2)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("tracking_sessions")
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  bookingId   String   @map("booking_id")
+  senderId    String   @map("sender_id")
+  message     String
+  messageType String   @default("text") @map("message_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  bookingId   String        @unique @map("booking_id")
+  amount      Decimal       @db.Decimal(10, 2)
+  platformFee Decimal       @map("platform_fee") @db.Decimal(10, 2)
+  netToVet    Decimal       @map("net_to_vet") @db.Decimal(10, 2)
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  externalRef String?       @map("external_ref")
+  telebirrRef String?       @map("telebirr_ref")
+  paidAt      DateTime?     @map("paid_at")
+  releasedAt  DateTime?     @map("released_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+model VetWallet {
+  id               String    @id @default(uuid())
+  vetId            String    @unique @map("vet_id")
+  availableBalance Decimal   @default(0) @map("available_balance") @db.Decimal(10, 2)
+  pendingEscrow    Decimal   @default(0) @map("pending_escrow") @db.Decimal(10, 2)
+  totalEarned      Decimal   @default(0) @map("total_earned") @db.Decimal(10, 2)
+  lastPayoutAt     DateTime? @map("last_payout_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  vet            VetProfile          @relation(fields: [vetId], references: [id], onDelete: Cascade)
+  transactions   WalletTransaction[]
+  payoutRequests PayoutRequest[]
+
+  @@map("vet_wallets")
+}
+
+model WalletTransaction {
+  id          String   @id @default(uuid())
+  walletId    String   @map("wallet_id")
+  amount      Decimal  @db.Decimal(10, 2)
+  type        String
+  bookingId   String?  @map("booking_id")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  wallet VetWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("wallet_transactions")
+}
+
+model PayoutRequest {
+  id          String        @id @default(uuid())
+  walletId    String        @map("wallet_id")
+  amount      Decimal       @db.Decimal(10, 2)
+  method      PaymentMethod
+  accountNo   String        @map("account_no")
+  status      String        @default("pending")
+  externalRef String?       @map("external_ref")
+  requestedAt DateTime      @default(now()) @map("requested_at")
+  processedAt DateTime?     @map("processed_at")
+
+  wallet VetWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("payout_requests")
+}
+
+model MedicalRecord {
+  id                   String   @id @default(uuid())
+  petId                String   @map("pet_id")
+  vetId                String   @map("vet_id")
+  bookingId            String   @unique @map("booking_id")
+  chiefComplaint       String?  @map("chief_complaint")
+  examNotes            String?  @map("exam_notes")
+  diagnosis            String?
+  followupInstructions String?  @map("followup_instructions")
+  nextVisitRecommended String?  @map("next_visit_recommended")
+  pdfUrl               String?  @map("pdf_url")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  pet          Pet           @relation(fields: [petId], references: [id])
+  booking      Booking       @relation(fields: [bookingId], references: [id])
+  vaccinations Vaccination[]
+  medications  Medication[]
+
+  @@map("medical_records")
+}
+
+model Vaccination {
+  id           String    @id @default(uuid())
+  petId        String    @map("pet_id")
+  recordId     String?   @map("record_id")
+  vaccineName  String    @map("vaccine_name")
+  givenAt      DateTime  @map("given_at")
+  nextDue      DateTime? @map("next_due")
+  lotNumber    String?   @map("lot_number")
+  notes        String?
+  reminderSent Boolean   @default(false) @map("reminder_sent")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  pet          Pet            @relation(fields: [petId], references: [id])
+  record       MedicalRecord? @relation(fields: [recordId], references: [id])
+  reminderJobs ReminderJob[]
+
+  @@map("vaccinations")
+}
+
+model Medication {
+  id        String  @id @default(uuid())
+  recordId  String  @map("record_id")
+  name      String
+  dosage    String?
+  route     String?
+  frequency String?
+  duration  String?
+  notes     String?
+
+  record MedicalRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@map("medications")
+}
+
+model ReminderJob {
+  id             String    @id @default(uuid())
+  vaccinationId  String    @map("vaccination_id")
+  ownerId        String    @map("owner_id")
+  preferredVetId String?   @map("preferred_vet_id")
+  dueDate        DateTime  @map("due_date")
+  remindAt       DateTime  @map("remind_at")
+  sentAt         DateTime? @map("sent_at")
+  bookingCreated Boolean   @default(false) @map("booking_created")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  vaccination Vaccination @relation(fields: [vaccinationId], references: [id], onDelete: Cascade)
+
+  @@map("reminder_jobs")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique @map("booking_id")
+  reviewerId String   @map("reviewer_id")
+  revieweeId String   @map("reviewee_id")
+  rating     Int
+  tags       String[]
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  booking  Booking @relation(fields: [bookingId], references: [id])
+  reviewer User    @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+
+  @@map("reviews")
+}
+
+model Listing {
+  id             String          @id @default(uuid())
+  sellerId       String          @map("seller_id")
+  category       ListingCategory
+  title          String
+  description    String?
+  price          Decimal?        @db.Decimal(12, 2)
+  priceType      PriceType       @default(FIXED) @map("price_type")
+  quantity       String?
+  location       String?
+  lat            Decimal?        @db.Decimal(9, 6)
+  lng            Decimal?        @db.Decimal(9, 6)
+  paymentMethods String[]        @map("payment_methods")
+  images         String[]
+  status         ListingStatus   @default(ACTIVE)
+  viewsCount     Int             @default(0) @map("views_count")
+  isVetVerified  Boolean         @default(false) @map("is_vet_verified")
+  visibility     String          @default("everyone")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  seller User           @relation(fields: [sellerId], references: [id])
+  offers ListingOffer[]
+
+  @@map("listings")
+}
+
+model ListingOffer {
+  id            String   @id @default(uuid())
+  listingId     String   @map("listing_id")
+  buyerId       String   @map("buyer_id")
+  offerAmount   Decimal? @map("offer_amount") @db.Decimal(12, 2)
+  message       String?
+  paymentMethod String?  @map("payment_method")
+  status        String   @default("pending")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@map("listing_offers")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  title     String
+  body      String
+  data      Json?
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model AiSession {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  bookingId  String?  @map("booking_id")
+  messages   Json     @default("[]")
+  escalated  Boolean  @default(false)
+  ragSources String[] @map("rag_sources")
+  language   Language @default(EN)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
+}
+
+model SosEvent {
+  id              String    @id @default(uuid())
+  ownerId         String    @map("owner_id")
+  emergencyType   String    @map("emergency_type")
+  ownerLat        Decimal   @map("owner_lat") @db.Decimal(9, 6)
+  ownerLng        Decimal   @map("owner_lng") @db.Decimal(9, 6)
+  ownerPhone      String    @map("owner_phone")
+  respondingVetId String?   @map("responding_vet_id")
+  bookingId       String?   @map("booking_id")
+  status          String    @default("active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  resolvedAt      DateTime? @map("resolved_at")
+
+  owner User @relation(fields: [ownerId], references: [id])
+
+  @@map("sos_events")
+}
+
+model LeakageFlag {
+  id              String    @id @default(uuid())
+  vetId           String    @map("vet_id")
+  leakageScore    Decimal   @map("leakage_score") @db.Decimal(5, 2)
+  suspiciousCount Int       @map("suspicious_count")
+  totalBookings   Int       @map("total_bookings")
+  status          String    @default("flagged")
+  reviewedBy      String?   @map("reviewed_by")
+  notes           String?
+  flaggedAt       DateTime  @default(now()) @map("flagged_at")
+  resolvedAt      DateTime? @map("resolved_at")
+
+  vet VetProfile @relation(fields: [vetId], references: [id], onDelete: Cascade)
+
+  @@map("leakage_flags")
+}
+EOF
+
+# Now Prisma will find the schema and generate the client
 RUN npx prisma generate
+
 EXPOSE 3000
+
 CMD ["node", "src/server.js"]
